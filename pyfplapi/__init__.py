@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 from datetime import timedelta, date
 
 import aiohttp
@@ -7,28 +8,41 @@ import async_timeout
 from bs4 import BeautifulSoup
 
 _LOGGER = logging.getLogger(__name__)
-BASE_URL = "https://app.fpl.com/wps/PA_ESFPortalWeb/getDailyConsumption.do"
+TIMEOUT = 5
 
 class FplApi(object):
-    """A class for getting daily kwh usage information from Florida Power & Light."""
+    """A class for getting energy usage information from Florida Power & Light."""
 
-    def __init__(
-            self, premise_number, account_number, user_type, is_tou, view_type,
-            loop, session):
-        """Initialize the data retrieval."""
+    def __init__(self, is_tou, loop, session):
+        """Initialize the data retrieval. Session should have BasicAuth flag set."""
         self._loop = loop
         self._session = session
-        self.premise_number = premise_number
-        self.account_number = account_number
-        self.user_type = user_type
-        self.is_tou = is_tou
-        self.view_type = view_type
-        self.search_series_name = "$" if view_type == 'dollar' else " kWh"
-        self.data = None
+        self._is_tou = is_tou
+        self._account_number = None
+        self._premise_number = None
 
-    async def async_get_usage(self):
-        async with async_timeout.timeout(10, loop=self._loop):
-            response = await self._session.get(self._get_url())
+        self.yesterday_kwh = None
+        self.yesterday_dollars = None
+        self.mtd_kwh = None
+        self.mtd_dollars = None
+
+    async def login (self):
+        """login and get account information"""
+        async with async_timeout.timeout(TIMEOUT, loop=self._loop):
+            response = await self._session.get("https://www.fpl.com/api/resources/login")
+
+        if (await response.json())["messages"][0]["messageCode"] != "login.success":
+            raise Exception('login failure')
+
+        async with async_timeout.timeout(TIMEOUT, loop=self._loop):
+            response = await self._session.get("https://www.fpl.com/api/resources/header")
+        json = await response.json()
+        self._account_number = json["data"]["selectedAccount"]["data"]["accountNumber"]
+        self._premise_number = json["data"]["selectedAccount"]["data"]["acctSecSettings"]["premiseNumber"]
+
+    async def async_get_yesterday_usage(self):
+        async with async_timeout.timeout(TIMEOUT, loop=self._loop):
+            response = await self._session.get(self._build_daily_url())
 
         _LOGGER.debug("Response from API: %s", response.status)
 
@@ -44,33 +58,40 @@ class FplApi(object):
 
         soup = BeautifulSoup(cleanerXML, 'html.parser')
 
-        self.data = soup.find("dataset", seriesname=self.search_series_name) \
-            .find("set")['value']
+        tool_text = soup.find("dataset", seriesname="$") \
+            .find("set")["tooltext"]
+
+        print(tool_text)
+
+        match = re.search(r"\{br\}kWh Usage: (.*) kWh \{br\}", tool_text)
+        if match:
+            self.yesterday_kwh = match.group(1)
+
+        match2 = re.search(r"\{br\}Approx\. Cost: (\$.*) \{br\}", tool_text)
+        if match2:
+            self.yesterday_dollars = match2.group(1)
 
 
-    def _get_url (self):
+    def _build_daily_url (self):
         end_date = date.today()
         start_date = end_date - timedelta(days=1)
 
-        return ("{base_url}"
+        return ("https://app.fpl.com/wps/PA_ESFPortalWeb/getDailyConsumption.do"
                "?premiseNumber={premise_number}"
                "&accountNumber={account_number}"
-               "&userType={user_type}"
                "&isTouUser={is_tou}"
-               "&viewType={view_type}"
                "&startDate={start_date}"
                "&endDate={end_date}"
+               "&userType=EXT"
                "&isResidential=true"
                "&certifiedDate=2000/01/01"
+               "&viewType=dollar"
                "&tempType=max"
                "&ecDayHumType=NoHum"
               ).format(
-                base_url=BASE_URL,
-                premise_number=self.premise_number,
-                account_number=self.account_number,
-                user_type=self.user_type,
-                is_tou=str(self.is_tou),
-                view_type=self.view_type,
+                premise_number=self._premise_number,
+                account_number=self._account_number,
+                is_tou=str(self._is_tou),
                 start_date=start_date.strftime("%Y%m%d"),
                 end_date=end_date.strftime("%Y%m%d"),
               )
