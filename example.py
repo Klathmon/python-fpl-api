@@ -4,18 +4,19 @@ import aiohttp
 from pyfplapi import FplApi
 
 async def main():
-    premise_number = ''
-    account_number = ''
-    user_type = 'EXT'
-    is_tou = False
-    view_type = 'kwh'
-    async with aiohttp.ClientSession() as session:
-        api = FplApi(
-            premise_number, account_number, user_type, is_tou,
-            view_type, loop, session)
-        await api.async_get_usage()
+    username = ''
+    password = ''
+    async with aiohttp.ClientSession(
+            auth=aiohttp.BasicAuth(username, password)) as session:
+        api = FplApi(True, loop, session)
+        await api.login()
+        await api.async_get_yesterday_usage()
+        await api.async_get_mtd_usage()
 
-        print(api.data)
+        print(api.yesterday_kwh)
+        print(api.yesterday_dollars)
+        print(api.mtd_kwh)
+        print(api.mtd_dollars)
 
 loop = asyncio.get_event_loop()
 loop.run_until_complete(main())
