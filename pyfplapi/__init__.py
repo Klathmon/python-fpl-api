@@ -61,8 +61,6 @@ class FplApi(object):
         tool_text = soup.find("dataset", seriesname="$") \
             .find("set")["tooltext"]
 
-        print(tool_text)
-
         match = re.search(r"\{br\}kWh Usage: (.*) kWh \{br\}", tool_text)
         if match:
             self.yesterday_kwh = match.group(1)
@@ -70,6 +68,21 @@ class FplApi(object):
         match2 = re.search(r"\{br\}Approx\. Cost: (\$.*) \{br\}", tool_text)
         if match2:
             self.yesterday_dollars = match2.group(1)
+
+    async def async_get_mtd_usage(self):
+        async with async_timeout.timeout(TIMEOUT, loop=self._loop):
+            response = await self._session.get(
+                "https://app.fpl.com/wps/myportal/EsfPortal")
+
+        soup = BeautifulSoup(await response.text(), 'html.parser')
+
+        self.mtd_kwh = soup.find(id="bpbsubcontainer") \
+            .find("table", class_="bpbtab_style_bill", width=430) \
+            .find_all("div", class_="bpbtabletxt")[-1].string
+
+        self.mtd_dollars = soup \
+            .find_all("div", class_="bpbusagebgnd")[1] \
+            .find("div", class_="bpbusagedollartxt").getText().strip()
 
 
     def _build_daily_url (self):
