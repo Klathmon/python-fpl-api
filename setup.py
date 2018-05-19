@@ -33,7 +33,7 @@ SOFTWARE.
 """
 
 setup(name='python-fpl-api',
-      version='0.0.1',
+      version='0.0.2',
       description='Python API for accessing energy usage data from Florida Power & Light.',
       url='https://github.com/Klathmon/python-fpl-api',
       download_url='https://github.com/Klathmon/python-fpl-api/archive/0.0.1.tar.gz',
