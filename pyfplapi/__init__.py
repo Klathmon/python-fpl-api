@@ -13,8 +13,10 @@ TIMEOUT = 5
 class FplApi(object):
     """A class for getting energy usage information from Florida Power & Light."""
 
-    def __init__(self, is_tou, loop, session):
+    def __init__(self, username, password, is_tou, loop, session):
         """Initialize the data retrieval. Session should have BasicAuth flag set."""
+        self._username = username
+        self._password = password
         self._loop = loop
         self._session = session
         self._is_tou = is_tou
@@ -29,7 +31,8 @@ class FplApi(object):
     async def login (self):
         """login and get account information"""
         async with async_timeout.timeout(TIMEOUT, loop=self._loop):
-            response = await self._session.get("https://www.fpl.com/api/resources/login")
+            response = await self._session.get("https://www.fpl.com/api/resources/login",
+                auth=aiohttp.BasicAuth(self._username, self._password))
 
         if (await response.json())["messages"][0]["messageCode"] != "login.success":
             raise Exception('login failure')
