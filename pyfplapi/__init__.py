@@ -64,11 +64,11 @@ class FplApi(object):
         tool_text = soup.find("dataset", seriesname="$") \
             .find("set")["tooltext"]
 
-        match = re.search(r"\{br\}kWh Usage: (.*) kWh \{br\}", tool_text)
+        match = re.search(r"\{br\}kWh Usage: (.*?) kWh \{br\}", tool_text)
         if match:
             self.yesterday_kwh = match.group(1)
 
-        match2 = re.search(r"\{br\}Approx\. Cost: (\$.*) \{br\}", tool_text)
+        match2 = re.search(r"\{br\}Approx\. Cost: (\$.*?) \{br\}", tool_text)
         if match2:
             self.yesterday_dollars = match2.group(1)
 
@@ -92,7 +92,7 @@ class FplApi(object):
         end_date = date.today()
         start_date = end_date - timedelta(days=1)
 
-        return ("https://app.fpl.com/wps/PA_ESFPortalWeb/getDailyConsumption.do"
+        return ("https://app.fpl.com/wps/PA_ESFPortalWeb/getDailyConsumption"
                "?premiseNumber={premise_number}"
                "&accountNumber={account_number}"
                "&isTouUser={is_tou}"
