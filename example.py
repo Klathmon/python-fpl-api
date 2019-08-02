@@ -12,6 +12,7 @@ async def main():
     await api.login()
     await api.async_get_yesterday_usage()
     await api.async_get_mtd_usage()
+    await session.close()
 
     print(api.yesterday_kwh)
     print(api.yesterday_dollars)
